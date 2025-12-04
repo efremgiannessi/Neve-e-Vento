@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Calcolatore Carichi NTC 2018 | Neve & Vento (Dark)</title>
+    <title>Calcolatore Carichi NTC 2018 | Neve, Vento & Accumuli</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -43,279 +43,373 @@
             border-radius: 2px;
         }
 
-        /* Print Styles - Force White on Print */
+        /* --- STILI DI STAMPA CRITICI --- */
+        /* Nascondiamo il container del report a schermo */
+        #report-container { display: none; }
+
         @media print {
-            body { background: white !important; color: black !important; }
-            .no-print { display: none !important; }
-            .print-break { page-break-before: always; }
-            .shadow-xl, .shadow-md, .shadow-lg { box-shadow: none !important; }
-            .bg-gray-900 { background: white !important; }
-            .bg-gray-800 { background: white !important; border: 1px solid #ddd !important; }
-            .text-gray-100, .text-gray-300, .text-gray-400 { color: black !important; }
-            .text-white { color: black !important; }
-            .border-gray-700 { border-color: #ddd !important; }
-            .card { break-inside: avoid; margin-bottom: 20px; }
-            /* Invert charts for print if possible or accept they might be dark blocks */
-            canvas { filter: invert(1) hue-rotate(180deg); } 
-        }
-        
-        .tab-active {
-            border-bottom: 2px solid #60A5FA;
-            color: #60A5FA;
-            font-weight: 600;
-            background-color: rgba(96, 165, 250, 0.1);
-        }
-        .tab-inactive {
-            color: #9CA3AF;
-            border-bottom: 2px solid transparent;
-        }
-        .tab-inactive:hover {
-            color: #E5E7EB;
-            border-bottom: 2px solid #374151;
+            /* 1. Nascondiamo TUTTA l'interfaccia app */
+            #app-interface, header, footer, aside, .no-print { 
+                display: none !important; 
+            }
+            
+            /* 2. Mostriamo SOLO il report */
+            #report-container { 
+                display: block !important; 
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                margin: 0;
+                padding: 0;
+                background-color: white !important;
+                color: black !important;
+            }
+
+            /* 3. Reset pagina */
+            @page { margin: 1.5cm; size: A4 portrait; }
+            body { background-color: white !important; margin: 0; padding: 0; }
+            
+            /* Tipografia per stampa */
+            h1 { font-size: 24pt !important; color: #1e3a8a !important; margin-bottom: 10px; } 
+            h2 { font-size: 16pt !important; border-bottom: 2px solid #ccc; padding-bottom: 5px; margin-top: 20px; color: #333 !important; page-break-after: avoid; }
+            p, td, th, li { font-size: 11pt !important; color: #000 !important; }
+            
+            /* Tabelle pulite */
+            .print-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+            .print-table th { background-color: #f3f4f6 !important; font-weight: bold; text-align: left; padding: 8px; border-bottom: 2px solid #666; }
+            .print-table td { border-bottom: 1px solid #ddd; padding: 6px 8px; }
+            
+            /* Gestione immagini grafici */
+            img { max-width: 100% !important; page-break-inside: avoid; }
+            .chart-container { page-break-inside: avoid; border: 1px solid #eee; padding: 10px; border-radius: 8px; margin-bottom: 10px; }
         }
     </style>
 </head>
 <body class="bg-gray-900 text-gray-100 min-h-screen flex flex-col">
 
-    <!-- Header -->
-    <header class="bg-gray-800 shadow-md border-b border-gray-700 z-10 sticky top-0">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-            <div class="flex items-center gap-3">
-                <div class="bg-blue-600 text-white p-2 rounded-lg shadow-lg shadow-blue-900/50">
-                    <i class="fa-solid fa-building-shield"></i>
-                </div>
-                <div>
-                    <h1 class="text-xl font-bold text-white leading-none">NTC 2018 Calculator</h1>
-                    <span class="text-xs text-gray-400 font-medium tracking-wider">ANALISI CARICHI NEVE E VENTO</span>
-                </div>
-            </div>
-            <div class="flex gap-3 no-print">
-                <button onclick="window.print()" class="text-gray-400 hover:text-blue-400 transition p-2" title="Stampa Report">
-                    <i class="fa-solid fa-print fa-lg"></i>
-                </button>
-            </div>
-        </div>
-    </header>
-
-    <!-- Main Content -->
-    <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full grid grid-cols-1 lg:grid-cols-12 gap-8">
+    <!-- INTERFACCIA PRINCIPALE (Nascosta durante la stampa via CSS) -->
+    <div id="app-interface" class="flex flex-col min-h-screen">
         
-        <!-- Sidebar Controls -->
-        <aside class="lg:col-span-4 space-y-6 no-print">
-            
-            <!-- Tabs -->
-            <div class="bg-gray-800 rounded-xl shadow-lg border border-gray-700 p-1 flex">
-                <button id="tab-snow" onclick="switchTab('snow')" class="flex-1 py-2 text-sm text-center transition rounded-lg tab-active">
-                    <i class="fa-regular fa-snowflake mr-2"></i>Neve
-                </button>
-                <button id="tab-wind" onclick="switchTab('wind')" class="flex-1 py-2 text-sm text-center transition rounded-lg tab-inactive">
-                    <i class="fa-solid fa-wind mr-2"></i>Vento
-                </button>
-            </div>
-
-            <!-- Snow Inputs -->
-            <div id="input-snow" class="bg-gray-800 rounded-xl shadow-lg border border-gray-700 p-6 space-y-5 animate-fade-in card">
-                <div class="border-l-4 border-blue-500 pl-4">
-                    <h2 class="text-lg font-bold text-white">Parametri Neve</h2>
-                    <p class="text-xs text-gray-400">Rif. NTC 2018 §3.4</p>
-                </div>
-
-                <div>
-                    <label class="block text-sm font-medium text-gray-300 mb-1">Zona Climatica</label>
-                    <select id="snow_zone" class="w-full bg-gray-700 border border-gray-600 text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5">
-                        <option value="I-alp">Zona I - Alpina</option>
-                        <option value="I-med">Zona I - Mediterranea</option>
-                        <option value="II">Zona II</option>
-                        <option value="III">Zona III</option>
-                    </select>
-                    <p class="mt-1 text-xs text-gray-500" id="zone_desc">Aosta, Belluno, Trento, Bolzano...</p>
-                </div>
-
-                <div>
-                    <label class="block text-sm font-medium text-gray-300 mb-1">Altitudine as (m s.l.m.)</label>
-                    <div class="flex items-center gap-3">
-                        <input type="range" id="snow_alt_slider" min="0" max="1500" value="200" class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer">
-                        <input type="number" id="snow_alt" value="200" class="w-20 bg-gray-700 border border-gray-600 text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2">
+        <!-- Header -->
+        <header class="bg-gray-800 shadow-md border-b border-gray-700 z-10 sticky top-0">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="bg-blue-600 text-white p-2 rounded-lg shadow-lg shadow-blue-900/50">
+                        <i class="fa-solid fa-building-shield"></i>
                     </div>
-                </div>
-
-                <div>
-                    <label class="block text-sm font-medium text-gray-300 mb-1">Inclinazione Falda α (°)</label>
-                    <div class="flex items-center gap-3">
-                        <input type="range" id="snow_angle_slider" min="0" max="80" value="15" class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer">
-                        <input type="number" id="snow_angle" value="15" class="w-20 bg-gray-700 border border-gray-600 text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2">
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-300 mb-1">Coeff. Esposizione Ce</label>
-                        <select id="snow_ce" class="w-full bg-gray-700 border border-gray-600 text-white text-sm rounded-lg p-2.5">
-                            <option value="1.0">1.0 (Normale)</option>
-                            <option value="0.8">0.8 (Ventosa)</option>
-                            <option value="1.2">1.2 (Protetta)</option>
+                        <h1 class="text-xl font-bold text-white leading-none">NTC 2018 Calculator</h1>
+                        <span class="text-xs text-gray-400 font-medium tracking-wider">NEVE | VENTO | ACCUMULO</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full grid grid-cols-1 lg:grid-cols-12 gap-8">
+            
+            <!-- Sidebar Controls -->
+            <aside class="lg:col-span-4 space-y-6">
+                
+                <!-- Tabs -->
+                <div class="bg-gray-800 rounded-xl shadow-lg border border-gray-700 p-1 flex">
+                    <button id="tab-snow" onclick="switchTab('snow')" class="flex-1 py-2 text-sm text-center transition rounded-lg tab-active">
+                        <i class="fa-regular fa-snowflake mr-2"></i>Neve
+                    </button>
+                    <button id="tab-wind" onclick="switchTab('wind')" class="flex-1 py-2 text-sm text-center transition rounded-lg tab-inactive">
+                        <i class="fa-solid fa-wind mr-2"></i>Vento
+                    </button>
+                    <button id="tab-drift" onclick="switchTab('drift')" class="flex-1 py-2 text-sm text-center transition rounded-lg tab-inactive">
+                        <i class="fa-solid fa-layer-group mr-2"></i>Accumulo
+                    </button>
+                </div>
+
+                <!-- Snow Inputs -->
+                <div id="input-snow" class="bg-gray-800 rounded-xl shadow-lg border border-gray-700 p-6 space-y-5 animate-fade-in card">
+                    <div class="border-l-4 border-blue-500 pl-4">
+                        <h2 class="text-lg font-bold text-white">Parametri Neve</h2>
+                        <p class="text-xs text-gray-400">Rif. NTC 2018 §3.4</p>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-1">Zona Climatica</label>
+                        <select id="snow_zone" class="w-full bg-gray-700 border border-gray-600 text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5">
+                            <option value="I-alp">Zona I - Alpina</option>
+                            <option value="I-med">Zona I - Mediterranea</option>
+                            <option value="II">Zona II</option>
+                            <option value="III">Zona III</option>
+                        </select>
+                        <p class="mt-1 text-xs text-gray-500" id="zone_desc">Aosta, Belluno, Trento, Bolzano...</p>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-1">Altitudine as (m s.l.m.)</label>
+                        <div class="flex items-center gap-3">
+                            <input type="range" id="snow_alt_slider" min="0" max="1500" value="200" class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer">
+                            <input type="number" id="snow_alt" value="200" class="w-20 bg-gray-700 border border-gray-600 text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-1">Inclinazione Falda α (°)</label>
+                        <div class="flex items-center gap-3">
+                            <input type="range" id="snow_angle_slider" min="0" max="80" value="15" class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer">
+                            <input type="number" id="snow_angle" value="15" class="w-20 bg-gray-700 border border-gray-600 text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300 mb-1">Coeff. Esp. Ce</label>
+                            <select id="snow_ce" class="w-full bg-gray-700 border border-gray-600 text-white text-sm rounded-lg p-2.5">
+                                <option value="1.0">1.0 (Normale)</option>
+                                <option value="0.8">0.8 (Ventosa)</option>
+                                <option value="1.2">1.2 (Protetta)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300 mb-1">Coeff. Term. Ct</label>
+                            <input type="number" id="snow_ct" value="1.0" step="0.1" class="w-full bg-gray-700 border border-gray-600 text-white text-sm rounded-lg p-2.5">
+                        </div>
+                    </div>
+
+                    <!-- Print Button for Snow -->
+                    <button onclick="generateReport('snow')" class="w-full mt-2 bg-blue-600/20 hover:bg-blue-600/40 text-blue-300 border border-blue-500/50 font-medium py-3 px-4 rounded-lg transition flex items-center justify-center gap-2 group">
+                        <i class="fa-solid fa-print text-lg group-hover:scale-110 transition-transform"></i>
+                        <span>Stampa Report Neve</span>
+                    </button>
+                </div>
+
+                <!-- Wind Inputs -->
+                <div id="input-wind" class="bg-gray-800 rounded-xl shadow-lg border border-gray-700 p-6 space-y-5 hidden card">
+                    <div class="border-l-4 border-teal-500 pl-4">
+                        <h2 class="text-lg font-bold text-white">Parametri Vento</h2>
+                        <p class="text-xs text-gray-400">Rif. NTC 2018 §3.3</p>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-1">Zona Vento</label>
+                        <select id="wind_zone" class="w-full bg-gray-700 border border-gray-600 text-white text-sm rounded-lg focus:ring-teal-500 focus:border-teal-500 block p-2.5">
+                            <option value="1">Zona 1 (Vb,0 = 25 m/s)</option>
+                            <option value="2">Zona 2 (Vb,0 = 25 m/s)</option>
+                            <option value="3">Zona 3 (Vb,0 = 27 m/s)</option>
+                            <option value="4">Zona 4 (Vb,0 = 28 m/s)</option>
+                            <option value="5">Zona 5 (Vb,0 = 30 m/s)</option>
+                            <option value="6">Zona 6 (Vb,0 = 28 m/s)</option>
+                            <option value="7">Zona 7 (Vb,0 = 28 m/s)</option>
+                            <option value="8">Zona 8 (Vb,0 = 30 m/s)</option>
+                            <option value="9">Zona 9 (Vb,0 = 31 m/s)</option>
                         </select>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-300 mb-1">Coeff. Termico Ct</label>
-                        <input type="number" id="snow_ct" value="1.0" step="0.1" class="w-full bg-gray-700 border border-gray-600 text-white text-sm rounded-lg p-2.5">
-                    </div>
-                </div>
-            </div>
-
-            <!-- Wind Inputs -->
-            <div id="input-wind" class="bg-gray-800 rounded-xl shadow-lg border border-gray-700 p-6 space-y-5 hidden card">
-                <div class="border-l-4 border-teal-500 pl-4">
-                    <h2 class="text-lg font-bold text-white">Parametri Vento</h2>
-                    <p class="text-xs text-gray-400">Rif. NTC 2018 §3.3</p>
-                </div>
-
-                <div>
-                    <label class="block text-sm font-medium text-gray-300 mb-1">Zona Vento</label>
-                    <select id="wind_zone" class="w-full bg-gray-700 border border-gray-600 text-white text-sm rounded-lg focus:ring-teal-500 focus:border-teal-500 block p-2.5">
-                        <option value="1">Zona 1 (Vb,0 = 25 m/s)</option>
-                        <option value="2">Zona 2 (Vb,0 = 25 m/s)</option>
-                        <option value="3">Zona 3 (Vb,0 = 27 m/s)</option>
-                        <option value="4">Zona 4 (Vb,0 = 28 m/s)</option>
-                        <option value="5">Zona 5 (Vb,0 = 30 m/s)</option>
-                        <option value="6">Zona 6 (Vb,0 = 28 m/s)</option>
-                        <option value="7">Zona 7 (Vb,0 = 28 m/s)</option>
-                        <option value="8">Zona 8 (Vb,0 = 30 m/s)</option>
-                        <option value="9">Zona 9 (Vb,0 = 31 m/s)</option>
-                    </select>
-                    <p class="mt-1 text-xs text-gray-500" id="wind_zone_desc">Valle d'Aosta, Piemonte, Lombardia...</p>
-                </div>
-
-                <div>
-                    <label class="block text-sm font-medium text-gray-300 mb-1">Classe Rugosità</label>
-                    <select id="wind_class" class="w-full bg-gray-700 border border-gray-600 text-white text-sm rounded-lg p-2.5">
-                        <option value="A">A - Aree Urbane dense</option>
-                        <option value="B">B - Aree Urbane/Suburbane</option>
-                        <option value="C">C - Aree Rurali con ostacoli</option>
-                        <option value="D">D - Mare/Costiera priva di ostacoli</option>
-                    </select>
-                </div>
-
-                <div>
-                    <label class="block text-sm font-medium text-gray-300 mb-1">Altezza Edificio z (m)</label>
-                    <div class="flex items-center gap-3">
-                        <input type="range" id="wind_z_slider" min="1" max="100" value="10" class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer">
-                        <input type="number" id="wind_z" value="10" class="w-20 bg-gray-700 border border-gray-600 text-white text-sm rounded-lg p-2">
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-300 mb-1">Distanza Costa (km)</label>
-                        <input type="number" id="wind_dist" value="20" class="w-full bg-gray-700 border border-gray-600 text-white text-sm rounded-lg p-2.5">
+                        <label class="block text-sm font-medium text-gray-300 mb-1">Classe Rugosità</label>
+                        <select id="wind_class" class="w-full bg-gray-700 border border-gray-600 text-white text-sm rounded-lg p-2.5">
+                            <option value="A">A - Aree Urbane dense</option>
+                            <option value="B">B - Aree Urbane/Suburbane</option>
+                            <option value="C">C - Aree Rurali con ostacoli</option>
+                            <option value="D">D - Mare/Costiera priva di ostacoli</option>
+                        </select>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-300 mb-1">Coeff. Press. Cp</label>
-                        <input type="number" id="wind_cp" value="0.8" step="0.1" class="w-full bg-gray-700 border border-gray-600 text-white text-sm rounded-lg p-2.5">
+                        <label class="block text-sm font-medium text-gray-300 mb-1">Altezza Edificio z (m)</label>
+                        <div class="flex items-center gap-3">
+                            <input type="range" id="wind_z_slider" min="1" max="100" value="10" class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer">
+                            <input type="number" id="wind_z" value="10" class="w-20 bg-gray-700 border border-gray-600 text-white text-sm rounded-lg p-2">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300 mb-1">Distanza Costa (km)</label>
+                            <input type="number" id="wind_dist" value="20" class="w-full bg-gray-700 border border-gray-600 text-white text-sm rounded-lg p-2.5">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300 mb-1">Coeff. Press. Cp</label>
+                            <input type="number" id="wind_cp" value="0.8" step="0.1" class="w-full bg-gray-700 border border-gray-600 text-white text-sm rounded-lg p-2.5">
+                        </div>
+                    </div>
+
+                    <!-- Print Button for Wind -->
+                    <button onclick="generateReport('wind')" class="w-full mt-2 bg-teal-600/20 hover:bg-teal-600/40 text-teal-300 border border-teal-500/50 font-medium py-3 px-4 rounded-lg transition flex items-center justify-center gap-2 group">
+                        <i class="fa-solid fa-print text-lg group-hover:scale-110 transition-transform"></i>
+                        <span>Stampa Report Vento</span>
+                    </button>
+                </div>
+
+                <!-- Drift/Accumulation Inputs -->
+                <div id="input-drift" class="bg-gray-800 rounded-xl shadow-lg border border-gray-700 p-6 space-y-5 hidden card animate-fade-in">
+                    <div class="border-l-4 border-purple-500 pl-4">
+                        <h2 class="text-lg font-bold text-white">Accumulo Neve</h2>
+                        <p class="text-xs text-gray-400">Salto di quota (NTC §3.4.4)</p>
+                    </div>
+                    
+                    <!-- Database Presets -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-1">Database Tipologie</label>
+                        <select id="drift_preset" onchange="applyDriftPreset()" class="w-full bg-gray-700 border border-gray-500 text-white text-sm rounded-lg p-2.5 focus:ring-purple-500 focus:border-purple-500">
+                            <option value="custom">Personalizzato</option>
+                            <option value="shed">Shed Industriale (h=1.5m, b=5m)</option>
+                            <option value="res_balcony">Balcone/Terrazzo (h=3m, b=2m)</option>
+                            <option value="warehouse">Capannone Adiacente Uffici (h=4m, b=10m)</option>
+                            <option value="parapet">Parapetto Copertura (h=1m, b=6m)</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-1">Dislivello h (m)</label>
+                        <div class="flex items-center gap-3">
+                            <input type="range" id="drift_h_slider" min="0.5" max="10" step="0.1" value="2" class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer">
+                            <input type="number" id="drift_h" value="2" step="0.1" class="w-20 bg-gray-700 border border-gray-600 text-white text-sm rounded-lg p-2">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-1">Lunghezza Falda Inf. b1 (m)</label>
+                        <input type="number" id="drift_b1" value="10" class="w-full bg-gray-700 border border-gray-600 text-white text-sm rounded-lg p-2.5">
+                        <p class="mt-1 text-xs text-gray-500">Lunghezza su cui scorre il vento</p>
+                    </div>
+
+                     <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-1">Peso specifico Neve γ (kN/m³)</label>
+                        <input type="number" id="drift_gamma" value="2.0" step="0.5" class="w-full bg-gray-700 border border-gray-600 text-white text-sm rounded-lg p-2.5">
+                        <p class="mt-1 text-xs text-gray-500">Tipicamente 2.0 kN/m³ (NTC)</p>
+                    </div>
+                    
+                    <div class="bg-gray-700/50 p-3 rounded-lg border border-gray-600">
+                        <p class="text-xs text-gray-400">Valore base qsk importato:</p>
+                        <p class="text-lg font-bold text-white" id="drift_qsk_ref">-- kN/m²</p>
+                    </div>
+
+                    <!-- Print Button for Drift -->
+                    <button onclick="generateReport('drift')" class="w-full mt-2 bg-purple-600/20 hover:bg-purple-600/40 text-purple-300 border border-purple-500/50 font-medium py-3 px-4 rounded-lg transition flex items-center justify-center gap-2 group">
+                        <i class="fa-solid fa-print text-lg group-hover:scale-110 transition-transform"></i>
+                        <span>Stampa Report Accumulo</span>
+                    </button>
+                </div>
+
+                <!-- Disclaimer -->
+                <div class="bg-yellow-900/30 border-l-4 border-yellow-500 p-4 rounded-r-lg">
+                    <div class="flex">
+                        <div class="flex-shrink-0">
+                            <i class="fa-solid fa-triangle-exclamation text-yellow-500"></i>
+                        </div>
+                        <div class="ml-3">
+                            <p class="text-xs text-yellow-200">
+                                Strumento indicativo per pre-dimensionamento. I calcoli devono essere validati da un ingegnere abilitato secondo NTC 2018.
+                            </p>
+                        </div>
                     </div>
                 </div>
+            </aside>
+
+            <!-- Results & Graphs -->
+            <section class="lg:col-span-8 space-y-6">
+                
+                <!-- Result Cards Grid -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <!-- Main Result -->
+                    <div class="bg-gray-800 rounded-xl shadow-lg p-6 border-t-4 border-indigo-500 card relative overflow-hidden">
+                        <p class="text-sm font-medium text-gray-400 uppercase tracking-wider mb-1" id="res-label-main">Carico Neve Totale (qs)</p>
+                        <div class="flex items-baseline relative z-10">
+                            <h3 class="text-3xl font-bold text-white" id="main_result">0.00</h3>
+                            <span class="ml-2 text-lg text-gray-400 font-medium">kN/m²</span>
+                        </div>
+                        <i class="fa-solid fa-calculator absolute -right-2 -bottom-4 text-8xl text-gray-700/20 z-0"></i>
+                    </div>
+
+                    <!-- Secondary Result 1 -->
+                    <div class="bg-gray-800 rounded-xl shadow-lg p-6 border-t-4 border-gray-600 card">
+                        <p class="text-sm font-medium text-gray-400 uppercase tracking-wider mb-1" id="res-label-sec1">Carico al Suolo (qsk)</p>
+                        <div class="flex items-baseline">
+                            <h3 class="text-2xl font-bold text-gray-200" id="sec_result_1">0.00</h3>
+                            <span class="ml-2 text-sm text-gray-500" id="unit-sec1">kN/m²</span>
+                        </div>
+                    </div>
+
+                    <!-- Secondary Result 2 -->
+                    <div class="bg-gray-800 rounded-xl shadow-lg p-6 border-t-4 border-gray-600 card">
+                        <p class="text-sm font-medium text-gray-400 uppercase tracking-wider mb-1" id="res-label-sec2">Coeff. Forma (μ1)</p>
+                        <div class="flex items-baseline">
+                            <h3 class="text-2xl font-bold text-gray-200" id="sec_result_2">0.8</h3>
+                            <span class="ml-2 text-sm text-gray-500" id="unit-sec2">-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Additional Statistics Box (Only for Drift) -->
+                <div id="drift-stats" class="bg-gray-800 rounded-xl shadow-lg p-4 border border-purple-500/30 hidden animate-fade-in card">
+                    <h4 class="text-sm font-bold text-purple-300 uppercase mb-3"><i class="fa-solid fa-chart-pie mr-2"></i>Statistiche Accumulo</h4>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="bg-gray-900/50 p-3 rounded border border-gray-700">
+                            <p class="text-xs text-gray-400">Lunghezza Accumulo (ls)</p>
+                            <p class="text-lg font-semibold text-white" id="stat_ls">0 m</p>
+                        </div>
+                        <div class="bg-gray-900/50 p-3 rounded border border-gray-700">
+                            <p class="text-xs text-gray-400">Peso Totale Cuneo</p>
+                            <p class="text-lg font-semibold text-white" id="stat_weight">0 kg/m</p>
+                        </div>
+                        <div class="bg-gray-900/50 p-3 rounded border border-gray-700">
+                            <p class="text-xs text-gray-400">Volume Neve</p>
+                            <p class="text-lg font-semibold text-white" id="stat_volume">0 m³/m</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Graphs Container -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 print-break">
+                    <!-- Chart 1 -->
+                    <div class="bg-gray-800 rounded-xl shadow-lg p-4 border border-gray-700 card">
+                        <h3 class="text-sm font-bold text-gray-300 mb-4 flex justify-between items-center">
+                            <span id="chart1_title">Variazione Carico vs Altitudine</span>
+                            <i class="fa-solid fa-chart-line text-blue-400"></i>
+                        </h3>
+                        <div class="relative h-64 w-full">
+                            <canvas id="chart1"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Chart 2 -->
+                    <div class="bg-gray-800 rounded-xl shadow-lg p-4 border border-gray-700 card">
+                        <h3 class="text-sm font-bold text-gray-300 mb-4 flex justify-between items-center">
+                            <span id="chart2_title">Coefficiente di Forma</span>
+                            <i class="fa-solid fa-chart-area text-teal-400"></i>
+                        </h3>
+                        <div class="relative h-64 w-full">
+                            <canvas id="chart2"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Detailed Data Table -->
+                <div class="bg-gray-800 rounded-xl shadow-lg overflow-hidden border border-gray-700 card">
+                    <div class="px-6 py-4 border-b border-gray-700 bg-gray-700/50 flex justify-between items-center">
+                        <h3 class="text-sm font-bold text-gray-200 uppercase">Dettagli di Calcolo</h3>
+                        <span class="text-xs font-mono bg-gray-900 px-2 py-1 rounded text-gray-400 border border-gray-600">NTC 2018</span>
+                    </div>
+                    <div class="p-6">
+                        <table class="min-w-full text-sm text-left text-gray-300">
+                            <tbody id="details_table">
+                                <!-- Populated via JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer class="bg-gray-800 border-t border-gray-700 py-6 mt-auto no-print">
+            <div class="max-w-7xl mx-auto px-4 text-center text-sm text-gray-500">
+                &copy; 2023 - Strumento Professionale per Ingegneria Civile
             </div>
+        </footer>
+    </div>
 
-            <!-- Disclaimer -->
-            <div class="bg-yellow-900/30 border-l-4 border-yellow-500 p-4 rounded-r-lg">
-                <div class="flex">
-                    <div class="flex-shrink-0">
-                        <i class="fa-solid fa-triangle-exclamation text-yellow-500"></i>
-                    </div>
-                    <div class="ml-3">
-                        <p class="text-xs text-yellow-200">
-                            Strumento indicativo per pre-dimensionamento. I calcoli devono essere validati da un ingegnere abilitato secondo NTC 2018.
-                        </p>
-                    </div>
-                </div>
-            </div>
-        </aside>
-
-        <!-- Results & Graphs -->
-        <section class="lg:col-span-8 space-y-6">
-            
-            <!-- Result Cards Grid -->
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <!-- Main Result -->
-                <div class="bg-gray-800 rounded-xl shadow-lg p-6 border-t-4 border-indigo-500 card">
-                    <p class="text-sm font-medium text-gray-400 uppercase tracking-wider mb-1" id="res-label-main">Carico Neve Totale (qs)</p>
-                    <div class="flex items-baseline">
-                        <h3 class="text-3xl font-bold text-white" id="main_result">0.00</h3>
-                        <span class="ml-2 text-lg text-gray-400 font-medium">kN/m²</span>
-                    </div>
-                    <div class="mt-4 text-xs text-green-400 flex items-center">
-                        <i class="fa-solid fa-check-circle mr-1"></i> Calcolo aggiornato
-                    </div>
-                </div>
-
-                <!-- Secondary Result 1 -->
-                <div class="bg-gray-800 rounded-xl shadow-lg p-6 border-t-4 border-gray-600 card">
-                    <p class="text-sm font-medium text-gray-400 uppercase tracking-wider mb-1" id="res-label-sec1">Carico al Suolo (qsk)</p>
-                    <div class="flex items-baseline">
-                        <h3 class="text-2xl font-bold text-gray-200" id="sec_result_1">0.00</h3>
-                        <span class="ml-2 text-sm text-gray-500">kN/m²</span>
-                    </div>
-                </div>
-
-                <!-- Secondary Result 2 -->
-                <div class="bg-gray-800 rounded-xl shadow-lg p-6 border-t-4 border-gray-600 card">
-                    <p class="text-sm font-medium text-gray-400 uppercase tracking-wider mb-1" id="res-label-sec2">Coeff. Forma (μ1)</p>
-                    <div class="flex items-baseline">
-                        <h3 class="text-2xl font-bold text-gray-200" id="sec_result_2">0.8</h3>
-                        <span class="ml-2 text-sm text-gray-500">-</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Graphs Container -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 print-break">
-                <!-- Chart 1 -->
-                <div class="bg-gray-800 rounded-xl shadow-lg p-4 border border-gray-700 card">
-                    <h3 class="text-sm font-bold text-gray-300 mb-4 flex justify-between items-center">
-                        <span id="chart1_title">Variazione Carico vs Altitudine</span>
-                        <i class="fa-solid fa-chart-line text-blue-400"></i>
-                    </h3>
-                    <div class="relative h-64 w-full">
-                        <canvas id="chart1"></canvas>
-                    </div>
-                </div>
-
-                <!-- Chart 2 -->
-                <div class="bg-gray-800 rounded-xl shadow-lg p-4 border border-gray-700 card">
-                    <h3 class="text-sm font-bold text-gray-300 mb-4 flex justify-between items-center">
-                        <span id="chart2_title">Coefficiente di Forma</span>
-                        <i class="fa-solid fa-chart-area text-teal-400"></i>
-                    </h3>
-                    <div class="relative h-64 w-full">
-                        <canvas id="chart2"></canvas>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Detailed Data Table -->
-            <div class="bg-gray-800 rounded-xl shadow-lg overflow-hidden border border-gray-700 card">
-                <div class="px-6 py-4 border-b border-gray-700 bg-gray-700/50 flex justify-between items-center">
-                    <h3 class="text-sm font-bold text-gray-200 uppercase">Dettagli di Calcolo</h3>
-                    <span class="text-xs font-mono bg-gray-900 px-2 py-1 rounded text-gray-400 border border-gray-600">NTC 2018</span>
-                </div>
-                <div class="p-6">
-                    <table class="min-w-full text-sm text-left text-gray-300">
-                        <tbody id="details_table">
-                            <!-- Populated via JS -->
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-        </section>
-    </main>
-
-    <!-- Footer -->
-    <footer class="bg-gray-800 border-t border-gray-700 py-6 mt-auto no-print">
-        <div class="max-w-7xl mx-auto px-4 text-center text-sm text-gray-500">
-            &copy; 2023 - Strumento Professionale per Ingegneria Civile
-        </div>
-    </footer>
+    <!-- HIDDEN REPORT CONTAINER FOR PRINTING -->
+    <div id="report-container">
+        <!-- Content injected via JS -->
+    </div>
 
     <!-- LOGIC -->
     <script>
@@ -323,32 +417,36 @@
         
         // Snow Zone Descriptions
         const SNOW_ZONES = {
-            'I-alp': "Zona I - Alpina (Aosta, Belluno, Trento, Bolzano, Sondrio, Verbano-Cusio-Ossola, Vercelli, Cuneo)",
-            'I-med': "Zona I - Mediterranea (Altre province Zona I)",
-            'II': "Zona II (Emilia Romagna, Toscana, Umbria, Marche, Lazio, Abruzzo, Molise, Campania, Basilicata, Calabria, Sardegna, Puglia, Sicilia, ecc.)",
-            'III': "Zona III (Provincia diversa dalle precedenti)"
+            'I-alp': "Zona I - Alpina",
+            'I-med': "Zona I - Mediterranea",
+            'II': "Zona II (Emilia Romagna, Toscana, ecc.)",
+            'III': "Zona III (Provincia diversa)"
         };
 
-        // Wind Zones Vb,0
-        const WIND_VBO = {
-            '1': 25, '2': 25, '3': 27, '4': 28, '5': 30, '6': 28, '7': 28, '8': 30, '9': 31
-        };
-
+        const WIND_VBO = { '1': 25, '2': 25, '3': 27, '4': 28, '5': 30, '6': 28, '7': 28, '8': 30, '9': 31 };
         const WIND_ZONES_DESC = {
-            '1': "Valle d'Aosta, Piemonte, Lombardia, Trentino, Veneto, Friuli (parziale)",
+            '1': "Valle d'Aosta, Piemonte, Lombardia...",
             '2': "Emilia Romagna",
-            '3': "Toscana, Marche, Umbria, Lazio, Abruzzo, Molise, Puglia, Campania, Basilicata, Calabria (parziale)",
-            '4': "Sicilia e Calabria (parziale)",
-            '5': "Sardegna (parziale)",
+            '3': "Toscana, Marche, Umbria, Lazio...",
+            '4': "Sicilia e Calabria",
+            '5': "Sardegna",
             '6': "Zone costiere",
             '7': "Zone costiere",
             '8': "Zone costiere",
             '9': "Isole ed aree esposte"
         };
 
+        const DRIFT_PRESETS = {
+            'shed': { h: 1.5, b1: 5 },
+            'res_balcony': { h: 3, b1: 2 },
+            'warehouse': { h: 4, b1: 10 },
+            'parapet': { h: 1, b1: 6 }
+        };
+
         // --- STATE ---
         let currentTab = 'snow';
         let charts = { c1: null, c2: null };
+        let globalQsk = 0; // Shared state for snow load
 
         // --- DOM ELEMENTS ---
         const els = {
@@ -366,246 +464,490 @@
             windZS: document.getElementById('wind_z_slider'),
             windDist: document.getElementById('wind_dist'),
             windCp: document.getElementById('wind_cp'),
+
+            driftPreset: document.getElementById('drift_preset'),
+            driftH: document.getElementById('drift_h'),
+            driftHS: document.getElementById('drift_h_slider'),
+            driftB1: document.getElementById('drift_b1'),
+            driftGamma: document.getElementById('drift_gamma'),
+            driftQskRef: document.getElementById('drift_qsk_ref'),
+            driftStats: document.getElementById('drift-stats'),
             
             mainRes: document.getElementById('main_result'),
             secRes1: document.getElementById('sec_result_1'),
             secRes2: document.getElementById('sec_result_2'),
+            unitSec1: document.getElementById('unit-sec1'),
+            unitSec2: document.getElementById('unit-sec2'),
             
+            statLs: document.getElementById('stat_ls'),
+            statWeight: document.getElementById('stat_weight'),
+            statVolume: document.getElementById('stat_volume'),
+
             detailsTable: document.getElementById('details_table'),
-            
             zoneDescSnow: document.getElementById('zone_desc'),
-            zoneDescWind: document.getElementById('wind_zone_desc')
         };
 
         // --- INITIALIZATION ---
         function init() {
-            // Sync sliders and inputs
             syncInput(els.snowAlt, els.snowAltS);
             syncInput(els.snowAngle, els.snowAngleS);
             syncInput(els.windZ, els.windZS);
+            syncInput(els.driftH, els.driftHS);
 
-            // Add event listeners
-            const snowInputs = [els.snowZone, els.snowAlt, els.snowAngle, els.snowCe, els.snowCt, els.snowAltS, els.snowAngleS];
-            const windInputs = [els.windZone, els.windClass, els.windZ, els.windDist, els.windCp, els.windZS];
+            // Listeners
+            [els.snowZone, els.snowAlt, els.snowAngle, els.snowCe, els.snowCt, els.snowAltS, els.snowAngleS].forEach(el => el.addEventListener('input', () => { if(currentTab==='snow') calculateSnow(); else if(currentTab==='drift') calculateDrift(); }));
+            [els.windZone, els.windClass, els.windZ, els.windDist, els.windCp, els.windZS].forEach(el => el.addEventListener('input', calculateWind));
+            [els.driftH, els.driftHS, els.driftB1, els.driftGamma].forEach(el => {
+                el.addEventListener('input', () => {
+                     document.getElementById('drift_preset').value = 'custom';
+                     calculateDrift();
+                });
+            });
 
-            snowInputs.forEach(el => el.addEventListener('input', calculateSnow));
-            windInputs.forEach(el => el.addEventListener('input', calculateWind));
-
-            // Initial calc
             calculateSnow();
         }
 
-        function syncInput(numberInput, rangeInput) {
-            numberInput.addEventListener('input', () => rangeInput.value = numberInput.value);
-            rangeInput.addEventListener('input', () => numberInput.value = rangeInput.value);
+        function syncInput(n, r) {
+            n.addEventListener('input', () => r.value = n.value);
+            r.addEventListener('input', () => n.value = r.value);
         }
 
         function switchTab(tab) {
             currentTab = tab;
-            const tabSnow = document.getElementById('tab-snow');
-            const tabWind = document.getElementById('tab-wind');
-            const containerSnow = document.getElementById('input-snow');
-            const containerWind = document.getElementById('input-wind');
+            const tabs = { snow: 'tab-snow', wind: 'tab-wind', drift: 'tab-drift' };
+            const containers = { snow: 'input-snow', wind: 'input-wind', drift: 'input-drift' };
 
-            if (tab === 'snow') {
-                tabSnow.className = "flex-1 py-2 text-sm text-center transition rounded-lg tab-active";
-                tabWind.className = "flex-1 py-2 text-sm text-center transition rounded-lg tab-inactive";
-                containerSnow.classList.remove('hidden');
-                containerWind.classList.add('hidden');
-                calculateSnow();
-            } else {
-                tabSnow.className = "flex-1 py-2 text-sm text-center transition rounded-lg tab-inactive";
-                tabWind.className = "flex-1 py-2 text-sm text-center transition rounded-lg tab-active";
-                containerSnow.classList.add('hidden');
-                containerWind.classList.remove('hidden');
-                calculateWind();
+            for (const key in tabs) {
+                const btn = document.getElementById(tabs[key]);
+                const cont = document.getElementById(containers[key]);
+                
+                if (key === tab) {
+                    btn.className = "flex-1 py-2 text-sm text-center transition rounded-lg tab-active";
+                    cont.classList.remove('hidden');
+                } else {
+                    btn.className = "flex-1 py-2 text-sm text-center transition rounded-lg tab-inactive";
+                    cont.classList.add('hidden');
+                }
+            }
+
+            // Stats box visibility
+            if(tab === 'drift') els.driftStats.classList.remove('hidden');
+            else els.driftStats.classList.add('hidden');
+
+            if (tab === 'snow') calculateSnow();
+            if (tab === 'wind') calculateWind();
+            if (tab === 'drift') calculateDrift();
+        }
+
+        function applyDriftPreset() {
+            const val = els.driftPreset.value;
+            if (val !== 'custom' && DRIFT_PRESETS[val]) {
+                const p = DRIFT_PRESETS[val];
+                els.driftH.value = p.h;
+                els.driftHS.value = p.h;
+                els.driftB1.value = p.b1;
+                calculateDrift();
             }
         }
 
-        // --- CALCULATION LOGIC: SNOW ---
+        // --- REPORT GENERATION ---
+        function generateReport(type) {
+            const container = document.getElementById('report-container');
+            const date = new Date().toLocaleDateString('it-IT');
+            let title = "", content = "", chart1Img = "", chart2Img = "";
+
+            // Capture charts (Synchronous)
+            // Ensure white background for charts in print
+            if(charts['c1']) chart1Img = charts['c1'].canvas.toDataURL('image/png');
+            if(charts['c2']) chart2Img = charts['c2'].canvas.toDataURL('image/png');
+
+            // Build content based on type
+            if(type === 'snow') {
+                title = "Report Calcolo Neve NTC 2018";
+                content = `
+                    <h2 class="text-xl font-bold mb-4 border-b pb-2">Parametri di Input</h2>
+                    <table class="print-table text-sm mb-6">
+                        <tr><th>Parametro</th><th>Valore</th></tr>
+                        <tr><td>Zona Climatica:</td><td>${SNOW_ZONES[els.snowZone.value]}</td></tr>
+                        <tr><td>Altitudine:</td><td>${els.snowAlt.value} m</td></tr>
+                        <tr><td>Inclinazione Falda:</td><td>${els.snowAngle.value}°</td></tr>
+                        <tr><td>Coeff. Esposizione (Ce):</td><td>${els.snowCe.value}</td></tr>
+                        <tr><td>Coeff. Termico (Ct):</td><td>${els.snowCt.value}</td></tr>
+                    </table>
+
+                    <h2 class="text-xl font-bold mb-4 border-b pb-2">Risultati di Calcolo</h2>
+                    <div class="bg-gray-100 p-4 rounded mb-6 border border-gray-300">
+                        <div class="text-3xl font-bold text-blue-800 mb-1">${els.mainRes.innerText} kN/m²</div>
+                        <div class="text-sm text-gray-600">Carico Neve Totale (qs)</div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4 mb-6">
+                         <div class="p-3 border rounded"><strong>Carico al Suolo (qsk):</strong> ${els.secRes1.innerText} kN/m²</div>
+                         <div class="p-3 border rounded"><strong>Coeff. Forma (μ1):</strong> ${els.secRes2.innerText}</div>
+                    </div>
+                `;
+            } else if(type === 'wind') {
+                title = "Report Calcolo Vento NTC 2018";
+                content = `
+                    <h2 class="text-xl font-bold mb-4 border-b pb-2">Parametri di Input</h2>
+                    <table class="print-table text-sm mb-6">
+                        <tr><th>Parametro</th><th>Valore</th></tr>
+                        <tr><td>Zona Vento:</td><td>Zona ${els.windZone.value} (${WIND_ZONES_DESC[els.windZone.value]})</td></tr>
+                        <tr><td>Classe Rugosità:</td><td>${els.windClass.value}</td></tr>
+                        <tr><td>Altezza Edificio:</td><td>${els.windZ.value} m</td></tr>
+                        <tr><td>Distanza Costa:</td><td>${els.windDist.value} km</td></tr>
+                        <tr><td>Coeff. Pressione (Cp):</td><td>${els.windCp.value}</td></tr>
+                    </table>
+
+                    <h2 class="text-xl font-bold mb-4 border-b pb-2">Risultati di Calcolo</h2>
+                    <div class="bg-gray-100 p-4 rounded mb-6 border border-gray-300">
+                        <div class="text-3xl font-bold text-teal-800 mb-1">${els.mainRes.innerText} kN/m²</div>
+                        <div class="text-sm text-gray-600">Pressione Vento (p)</div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4 mb-6">
+                         <div class="p-3 border rounded"><strong>Vel. Base (Vb):</strong> ${els.secRes1.innerText} m/s</div>
+                         <div class="p-3 border rounded"><strong>Press. Cinetica (qb):</strong> ${els.secRes2.innerText} kN/m²</div>
+                    </div>
+                `;
+            } else if(type === 'drift') {
+                title = "Report Accumulo Neve NTC 2018";
+                content = `
+                    <h2 class="text-xl font-bold mb-4 border-b pb-2">Parametri di Input</h2>
+                    <table class="print-table text-sm mb-6">
+                        <tr><th>Parametro</th><th>Valore</th></tr>
+                        <tr><td>Dislivello (h):</td><td>${els.driftH.value} m</td></tr>
+                        <tr><td>Lunghezza Falda (b1):</td><td>${els.driftB1.value} m</td></tr>
+                        <tr><td>Peso specifico (γ):</td><td>${els.driftGamma.value} kN/m³</td></tr>
+                        <tr><td>Carico Neve Base (qsk):</td><td>${els.driftQskRef.innerText}</td></tr>
+                    </table>
+
+                    <h2 class="text-xl font-bold mb-4 border-b pb-2">Risultati di Calcolo</h2>
+                    <div class="bg-gray-100 p-4 rounded mb-6 border border-gray-300">
+                        <div class="text-3xl font-bold text-purple-800 mb-1">${els.mainRes.innerText} kN/m²</div>
+                        <div class="text-sm text-gray-600">Carico Max Accumulo (picco)</div>
+                    </div>
+                    <div class="grid grid-cols-3 gap-4 mb-6 text-sm">
+                         <div class="p-3 border rounded"><strong>Lunghezza (ls):</strong> ${els.secRes2.innerText} m</div>
+                         <div class="p-3 border rounded"><strong>Coeff. Forma (μ2):</strong> ${els.secRes1.innerText}</div>
+                         <div class="p-3 border rounded"><strong>Peso Totale:</strong> ${document.getElementById('stat_weight').innerText}</div>
+                    </div>
+                `;
+            }
+
+            // Assemble HTML
+            container.innerHTML = `
+                <div class="flex justify-between items-center mb-8 border-b-2 border-gray-800 pb-4">
+                    <div>
+                        <h1 class="text-3xl font-bold text-blue-900">${title}</h1>
+                        <p class="text-gray-500 text-sm">Generato il ${date}</p>
+                    </div>
+                    <div class="text-right">
+                         <div class="bg-gray-800 text-white p-2 rounded inline-block font-bold">NTC 2018</div>
+                    </div>
+                </div>
+
+                ${content}
+
+                <h2 class="text-xl font-bold mb-4 border-b pb-2 break-inside-avoid">Grafici Analisi</h2>
+                <div class="grid grid-cols-2 gap-4 mb-8">
+                    <div class="chart-container break-inside-avoid">
+                        <img src="${chart1Img}" class="w-full h-auto" />
+                        <p class="text-center text-xs text-gray-500 mt-2">Grafico 1</p>
+                    </div>
+                    <div class="chart-container break-inside-avoid">
+                        <img src="${chart2Img}" class="w-full h-auto" />
+                        <p class="text-center text-xs text-gray-500 mt-2">Grafico 2</p>
+                    </div>
+                </div>
+
+                <div class="text-xs text-gray-400 mt-12 pt-4 border-t text-center">
+                    Documento generato automaticamente. I valori devono essere validati da un professionista abilitato.
+                </div>
+            `;
+
+            // Trigger Print (No flickering anymore due to CSS @media print)
+            window.print();
+        }
+
+        // --- SNOW LOGIC ---
         function getQsk(zone, as) {
             as = parseFloat(as);
-            if (zone === 'I-alp') {
-                if (as <= 200) return 1.50;
-                return 1.39 * (1 + Math.pow(as / 728, 2));
-            }
-            if (zone === 'I-med') {
-                if (as <= 200) return 1.50;
-                return 1.35 * (1 + Math.pow(as / 602, 2));
-            }
-            if (zone === 'II') {
-                if (as <= 200) return 1.00;
-                return 0.85 * (1 + Math.pow(as / 481, 2));
-            }
-            if (zone === 'III') {
-                if (as <= 200) return 0.60;
-                return 0.51 * (1 + Math.pow(as / 481, 2));
-            }
+            if (zone === 'I-alp') return as <= 200 ? 1.50 : 1.39 * (1 + Math.pow(as / 728, 2));
+            if (zone === 'I-med') return as <= 200 ? 1.50 : 1.35 * (1 + Math.pow(as / 602, 2));
+            if (zone === 'II') return as <= 200 ? 1.00 : 0.85 * (1 + Math.pow(as / 481, 2));
+            if (zone === 'III') return as <= 200 ? 0.60 : 0.51 * (1 + Math.pow(as / 481, 2));
             return 0;
         }
 
-        function getMu1(angle) {
-            if (angle <= 30) return 0.8;
-            if (angle >= 60) return 0.0;
-            // Interpolazione lineare: 0.8 a 30, 0.0 a 60
-            return 0.8 * (60 - angle) / 30;
-        }
-
         function calculateSnow() {
-            // Update labels
-            document.getElementById('res-label-main').innerText = "Carico Neve Copertura (qs)";
-            document.getElementById('res-label-sec1').innerText = "Carico al Suolo (qsk)";
-            document.getElementById('res-label-sec2').innerText = "Coeff. Forma (μ1)";
-            document.getElementById('chart1_title').innerText = "Variazione qsk con Altitudine";
-            document.getElementById('chart2_title').innerText = "Variazione μ1 con Pendenza";
+            setupUI('Carico Neve Copertura (qs)', 'Carico al Suolo (qsk)', 'Coeff. Forma (μ1)', 
+                    'Variazione qsk con Altitudine', 'Variazione μ1 con Pendenza');
             els.zoneDescSnow.innerText = SNOW_ZONES[els.snowZone.value];
 
-            // Values
             const zone = els.snowZone.value;
             const as = parseFloat(els.snowAlt.value);
             const angle = parseFloat(els.snowAngle.value);
             const Ce = parseFloat(els.snowCe.value);
             const Ct = parseFloat(els.snowCt.value);
 
-            // Calc
             const qsk = getQsk(zone, as);
-            const mu1 = getMu1(angle);
+            globalQsk = qsk; // Update global
+            const mu1 = angle <= 30 ? 0.8 : (angle >= 60 ? 0.0 : 0.8 * (60 - angle) / 30);
             const qs = qsk * mu1 * Ce * Ct;
 
-            // Update UI
             els.mainRes.innerText = qs.toFixed(2);
             els.secRes1.innerText = qsk.toFixed(2);
             els.secRes2.innerText = mu1.toFixed(2);
+            els.unitSec1.innerText = "kN/m²";
+            els.unitSec2.innerText = "-";
 
             updateTable([
                 ['Zona Climatica', zone],
-                ['Altitudine (as)', `${as} m`],
-                ['Carico al Suolo Caratteristico (qsk)', `${qsk.toFixed(3)} kN/m²`],
-                ['Pendenza Falda (α)', `${angle}°`],
-                ['Coefficiente Forma (μ1)', mu1.toFixed(2)],
-                ['Coefficiente Esposizione (Ce)', Ce.toFixed(1)],
-                ['Coefficiente Termico (Ct)', Ct.toFixed(1)],
-                ['Carico Neve Copertura (qs)', `<strong class="text-blue-400">${qs.toFixed(3)} kN/m²</strong>`]
+                ['Altitudine', `${as} m`],
+                ['Carico Suolo (qsk)', `${qsk.toFixed(2)} kN/m²`],
+                ['Pendenza (α)', `${angle}°`],
+                ['Coeff. Forma (μ1)', mu1.toFixed(2)],
+                ['Coeff. Esposizione (Ce)', Ce],
+                ['Coeff. Termico (Ct)', Ct],
+                ['Carico Neve (qs)', `<strong class="text-blue-400">${qs.toFixed(2)} kN/m²</strong>`]
             ]);
 
             // Charts
-            updateSnowCharts(zone, as, angle);
-        }
-
-        function updateSnowCharts(zone, currentAs, currentAngle) {
             const ctx1 = document.getElementById('chart1').getContext('2d');
             const ctx2 = document.getElementById('chart2').getContext('2d');
+            
+            const alts = [], qsks = [];
+            for (let i = 0; i <= 1500; i += 100) { alts.push(i); qsks.push(getQsk(zone, i)); }
+            
+            const angs = [], mus = [];
+            for (let i = 0; i <= 90; i += 5) { angs.push(i); mus.push(i <= 30 ? 0.8 : (i >= 60 ? 0.0 : 0.8 * (60 - i) / 30)); }
 
-            // Chart 1: Qsk vs Altitude (Range 0 - 1500m)
-            const alts = [];
-            const qsks = [];
-            for (let i = 0; i <= 1500; i += 100) {
-                alts.push(i);
-                qsks.push(getQsk(zone, i));
-            }
-
-            // Chart 2: Mu1 vs Angle (0 - 90)
-            const angles = [];
-            const mus = [];
-            for (let i = 0; i <= 90; i += 5) {
-                angles.push(i);
-                mus.push(getMu1(i));
-            }
-
-            renderChart('c1', ctx1, 'Altitudine (m)', 'qsk (kN/m²)', alts, qsks, currentAs, getQsk(zone, currentAs), '#60A5FA');
-            renderChart('c2', ctx2, 'Pendenza (°)', 'μ1', angles, mus, currentAngle, getMu1(currentAngle), '#2DD4BF');
+            renderChart('c1', ctx1, 'Altitudine (m)', 'qsk', alts, qsks, as, qsk, '#60A5FA');
+            renderChart('c2', ctx2, 'Pendenza (°)', 'μ1', angs, mus, angle, mu1, '#2DD4BF');
         }
 
-        // --- CALCULATION LOGIC: WIND ---
+        // --- WIND LOGIC ---
         function calculateWind() {
-            // Update labels
-            document.getElementById('res-label-main').innerText = "Pressione del Vento (p)";
-            document.getElementById('res-label-sec1').innerText = "Vel. Base (Vb)";
-            document.getElementById('res-label-sec2').innerText = "Pressione Cinetica (qb)";
-            document.getElementById('chart1_title').innerText = "Profilo Pressione Vento (p) vs Altezza";
-            document.getElementById('chart2_title').innerText = "Coeff. Esposizione Ce(z) vs Altezza";
-            els.zoneDescWind.innerText = WIND_ZONES_DESC[els.windZone.value];
-
+            setupUI('Pressione del Vento (p)', 'Vel. Base (Vb)', 'Pressione Cinetica (qb)', 
+                    'Profilo Pressione Vento vs Altezza', 'Coeff. Esposizione Ce(z)');
+            
             const zone = els.windZone.value;
             const rClass = els.windClass.value;
             const z = parseFloat(els.windZ.value);
-            const dist = parseFloat(els.windDist.value); 
             const cp = parseFloat(els.windCp.value);
-            const cd = 1.0; 
-
-            // 1. Basic Velocity Vb
             const vb0 = WIND_VBO[zone];
-            const ca = 1.0; 
-            const vb = vb0 * ca; 
-
-            // 2. Kinetic Pressure qb
-            const ro = 1.25; 
-            const qb = 0.5 * ro * Math.pow(vb, 2) / 1000; 
-
-            // 3. Exposure Coefficient Ce(z)
-            let kr, z0, zmin;
-            switch(rClass) {
-                case 'A': kr=0.23; z0=0.70; zmin=12; break; 
-                case 'B': kr=0.22; z0=0.30; zmin=8; break;  
-                case 'C': kr=0.20; z0=0.10; zmin=4; break;  
-                case 'D': kr=0.19; z0=0.05; zmin=2; break;  
-            }
             
-            const ct = 1.0;
+            const vb = vb0; 
+            const qb = 0.5 * 1.25 * Math.pow(vb, 2) / 1000;
 
-            function getCe(height) {
-                const zCalc = Math.max(height, zmin);
+            let kr, z0, zmin;
+            if (rClass === 'A') { kr=0.23; z0=0.70; zmin=12; }
+            else if (rClass === 'B') { kr=0.22; z0=0.30; zmin=8; }
+            else if (rClass === 'C') { kr=0.20; z0=0.10; zmin=4; }
+            else { kr=0.19; z0=0.05; zmin=2; }
+
+            const getCe = (h) => {
+                const zCalc = Math.max(h, zmin);
                 const ln = Math.log(zCalc / z0);
-                return Math.pow(kr, 2) * ct * ln * (7 + ct * ln);
-            }
+                return Math.pow(kr, 2) * ln * (7 + ln);
+            };
 
             const ce = getCe(z);
-            
-            // 4. Final Pressure p = qb * ce * cp * cd
-            const p = qb * ce * cp * cd;
+            const p = qb * ce * cp;
 
-            // Update UI
             els.mainRes.innerText = p.toFixed(3);
-            els.secRes1.innerText = vb.toFixed(1) + " m/s";
-            els.secRes2.innerText = qb.toFixed(3) + " kN/m²";
+            els.secRes1.innerText = vb.toFixed(1);
+            els.unitSec1.innerText = "m/s";
+            els.secRes2.innerText = qb.toFixed(3);
+            els.unitSec2.innerText = "kN/m²";
 
             updateTable([
-                ['Zona Vento', `Zona ${zone}`],
-                ['Velocità Base Rif. (Vb,0)', `${vb0} m/s`],
-                ['Classe Rugosità', `Cat. ${rClass}`],
-                ['Altezza Edificio (z)', `${z} m`],
-                ['Pressione Cinetica Base (qb)', `${qb.toFixed(4)} kN/m²`],
-                ['Coeff. Esposizione (Ce)', ce.toFixed(3)],
-                ['Coeff. Pressione (Cp)', cp.toFixed(2)],
-                ['Pressione Vento (p)', `<strong class="text-teal-400">${p.toFixed(3)} kN/m²</strong>`]
+                ['Zona Vento', zone],
+                ['Velocità Base (Vb)', `${vb} m/s`],
+                ['Rugosità', rClass],
+                ['Altezza (z)', `${z} m`],
+                ['Press. Cinetica (qb)', `${qb.toFixed(3)} kN/m²`],
+                ['Coeff. Esposizione (Ce)', ce.toFixed(2)],
+                ['Coeff. Pressione (Cp)', cp],
+                ['Pressione (p)', `<strong class="text-teal-400">${p.toFixed(3)} kN/m²</strong>`]
             ]);
 
-            updateWindCharts(qb, cp, cd, getCe, z);
+            const ctx1 = document.getElementById('chart1').getContext('2d');
+            const ctx2 = document.getElementById('chart2').getContext('2d');
+            
+            const hs = [], ps = [], ces = [];
+            for(let h=0; h<= Math.max(z*1.5, 20); h+=2) {
+                let v = getCe(h==0?0.1:h);
+                hs.push(h); ces.push(v); ps.push(qb*v*cp);
+            }
+            renderChart('c1', ctx1, 'Altezza (m)', 'p (kN/m²)', hs, ps, z, p, '#60A5FA', true);
+            renderChart('c2', ctx2, 'Altezza (m)', 'Ce', hs, ces, z, ce, '#2DD4BF', true);
         }
 
-        function updateWindCharts(qb, cp, cd, ceFunc, currentZ) {
+        // --- DRIFT (ACCUMULO) LOGIC ---
+        function calculateDrift() {
+            // Recalculate basic snow to ensure qsk is fresh
+            const qsk = getQsk(els.snowZone.value, els.snowAlt.value);
+            els.driftQskRef.innerText = qsk.toFixed(2) + " kN/m²";
+
+            setupUI('Carico Max Accumulo (μ2·qsk)', 'Coeff. Forma (μ2)', 'Lunghezza (ls)', 
+                    'Profilo di Carico Accumulo', 'Distribuzione Carico (Sezione)');
+            
+            const h = parseFloat(els.driftH.value);
+            const b1 = parseFloat(els.driftB1.value);
+            const gamma = parseFloat(els.driftGamma.value);
+            const ce = parseFloat(els.snowCe.value);
+            const ct = parseFloat(els.snowCt.value);
+
+            // NTC 2018 Logic for Salti di Quota
+            // Drift length ls
+            let ls = 2 * h;
+            if (ls < 5) ls = 5;
+            if (ls > 15) ls = 15;
+            if (ls > b1) ls = b1; // Cannot exceed roof length
+
+            // Shape coefficient mu2
+            // mu2 = gamma * h / sk + mu_s (neglecting mu_s approx for pure drift dominance or assume mu_s=0 on flat)
+            // Simplified conservative: mu2 = gamma * h / qsk
+            // NTC Limit: range 0.8 <= mu2 <= 2.0 (standard) OR calculated
+            // Detailed calc:
+            let mu2 = (gamma * h) / qsk;
+            if (mu2 < 0.8) mu2 = 0.8; 
+            // NTC often caps at 2.0 for standard cases, but for drift it allows higher if calculated physically
+            // We keep the physical calculation (gamma*h/qsk) as primary for safety
+            
+            const qMax = mu2 * qsk * ce * ct;
+            const qFlat = 0.8 * qsk * ce * ct; // Standard load after drift
+
+            // Stats
+            // Area of trapezoid/triangle part (Over standard load)
+            // The drift adds to the standard load. 
+            // Shape: Starts at qMax at x=0, goes to qFlat at x=ls.
+            // Volume (Area of load diagram per meter depth)
+            // Integration from 0 to ls of (Linear interpolation)
+            // Total Weight per meter = (qMax + qFlat)/2 * ls
+            const weight = ((qMax + qFlat) / 2) * ls; // kN/m
+            const weightKg = weight * 101.97; // approx kg
+            const vol = weight / gamma; 
+
+            // UI Update
+            els.mainRes.innerText = qMax.toFixed(2);
+            els.secRes1.innerText = mu2.toFixed(2);
+            els.unitSec1.innerText = "-";
+            els.secRes2.innerText = ls.toFixed(1);
+            els.unitSec2.innerText = "m";
+
+            els.statLs.innerText = ls.toFixed(1) + " m";
+            els.statWeight.innerText = weightKg.toFixed(0) + " kg/m";
+            els.statVolume.innerText = vol.toFixed(2) + " m³/m";
+
+            updateTable([
+                ['Dislivello (h)', `${h} m`],
+                ['Lunghezza Falda (b1)', `${b1} m`],
+                ['Densità Neve (γ)', `${gamma} kN/m³`],
+                ['Carico Base (qsk)', `${qsk.toFixed(2)} kN/m²`],
+                ['Lunghezza Accumulo (ls)', `${ls.toFixed(1)} m`],
+                ['Coeff. Forma Max (μ2)', `<strong class="text-purple-400">${mu2.toFixed(2)}</strong>`],
+                ['Carico Picco Parete', `${qMax.toFixed(2)} kN/m²`],
+                ['Carico Fine Accumulo', `${qFlat.toFixed(2)} kN/m²`]
+            ]);
+
+            // Charts
             const ctx1 = document.getElementById('chart1').getContext('2d');
             const ctx2 = document.getElementById('chart2').getContext('2d');
 
-            const heights = [];
-            const pressures = [];
-            const ces = [];
-            
-            const maxH = Math.max(Math.ceil(currentZ * 1.5), 20);
-
-            for(let h=0; h<=maxH; h+=2) {
-                let hCalc = h === 0 ? 0.1 : h;
-                let ceVal = ceFunc(hCalc);
-                heights.push(h);
-                ces.push(ceVal);
-                pressures.push(qb * ceVal * cp * cd);
+            // Chart 1: Load Profile vs Distance
+            // Shows the drift shape
+            const dists = [];
+            const loads = [];
+            const steps = 20;
+            for(let i=0; i<=steps; i++) {
+                let x = (b1 / steps) * i;
+                dists.push(x.toFixed(1));
+                if (x <= ls) {
+                    // Linear interp from qMax to qFlat
+                    let load = qMax - ((qMax - qFlat) / ls) * x;
+                    loads.push(load);
+                } else {
+                    loads.push(qFlat);
+                }
             }
 
-            renderChart('c1', ctx1, 'Altezza z (m)', 'Pressione p (kN/m²)', heights, pressures, currentZ, qb * ceFunc(currentZ) * cp * cd, '#60A5FA', true);
-            renderChart('c2', ctx2, 'Altezza z (m)', 'Ce(z)', heights, ces, currentZ, ceFunc(currentZ), '#2DD4BF', true);
+            // Render Chart 1 (Load Profile)
+            if (charts['c1']) charts['c1'].destroy();
+            charts['c1'] = new Chart(ctx1, {
+                type: 'line',
+                data: {
+                    labels: dists,
+                    datasets: [{
+                        label: 'Carico Neve (kN/m²)',
+                        data: loads,
+                        borderColor: '#A855F7',
+                        backgroundColor: 'rgba(168, 85, 247, 0.4)',
+                        fill: true,
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    scales: {
+                        y: { beginAtZero: true, title: {display: true, text: 'Carico (kN/m²)'} },
+                        x: { title: {display: true, text: 'Distanza da parete (m)'} }
+                    },
+                    plugins: { legend: {display: false} }
+                }
+            });
+
+            // Chart 2: Total Weight vs Height (Sensitivity Analysis)
+            // How does accumulation weight change if h increases?
+            const hs = [], ws = [];
+            for(let th=0.5; th<=5; th+=0.5) {
+                hs.push(th);
+                // Calc local mu2, ls
+                let t_ls = Math.min(Math.max(2*th, 5), 15, b1);
+                let t_mu2 = Math.max((gamma * th) / qsk, 0.8);
+                let t_qMax = t_mu2 * qsk * ce * ct;
+                let t_w = ((t_qMax + qFlat)/2) * t_ls;
+                ws.push(t_w);
+            }
+             if (charts['c2']) charts['c2'].destroy();
+            charts['c2'] = new Chart(ctx2, {
+                type: 'line',
+                data: {
+                    labels: hs,
+                    datasets: [{
+                        label: 'Peso Totale (kN/m)',
+                        data: ws,
+                        borderColor: '#2DD4BF',
+                        backgroundColor: 'rgba(45, 212, 191, 0.2)',
+                        fill: true
+                    }, {
+                        type: 'scatter',
+                        label: 'Attuale',
+                        data: [{x: h, y: weight}],
+                        backgroundColor: '#EF4444',
+                        borderColor: '#fff'
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    scales: {
+                        y: { title: {display: true, text: 'Peso Cuneo (kN/m)'} },
+                        x: { title: {display: true, text: 'Dislivello h (m)'} }
+                    },
+                    plugins: { legend: {display: false} }
+                }
+            });
         }
 
-        // --- SHARED UI FUNCTIONS ---
+        // --- HELPERS ---
+        function setupUI(mainL, sec1L, sec2L, c1T, c2T) {
+            document.getElementById('res-label-main').innerText = mainL;
+            document.getElementById('res-label-sec1').innerText = sec1L;
+            document.getElementById('res-label-sec2').innerText = sec2L;
+            document.getElementById('chart1_title').innerText = c1T;
+            document.getElementById('chart2_title').innerText = c2T;
+        }
+
         function updateTable(rows) {
             const html = rows.map(r => `
                 <tr class="border-b border-gray-700 last:border-0 hover:bg-gray-700/50">
@@ -616,78 +958,29 @@
             els.detailsTable.innerHTML = html;
         }
 
-        function renderChart(key, ctx, labelX, labelY, dataX, dataY, currentX, currentY, color, isHorizontal = false) {
+        function renderChart(key, ctx, lx, ly, dx, dy, cx, cy, col, fill=true) {
             if (charts[key]) charts[key].destroy();
-
-            let datasets = [{
-                label: labelY,
-                data: dataY,
-                borderColor: color,
-                backgroundColor: color + '20', // transparent version
-                borderWidth: 2,
-                pointRadius: 0,
-                fill: true,
-                tension: 0.4
-            }];
-
-            datasets.push({
-                label: 'Valore Attuale',
-                data: [{x: currentX, y: currentY}],
-                backgroundColor: '#EF4444',
-                borderColor: '#1F2937', // dark border for point
-                borderWidth: 2,
-                pointRadius: 6,
-                type: 'scatter'
-            });
-
-            Chart.defaults.color = '#9CA3AF';
-            Chart.defaults.borderColor = '#374151';
-
             charts[key] = new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: dataX,
-                    datasets: datasets
+                    labels: dx,
+                    datasets: [
+                        { label: ly, data: dy, borderColor: col, backgroundColor: col+'33', fill: fill, borderWidth: 2, pointRadius: 0, tension: 0.3 },
+                        { type: 'scatter', label: 'Point', data: [{x: cx, y: cy}], backgroundColor: '#EF4444', pointRadius: 6 }
+                    ]
                 },
                 options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    interaction: {
-                        mode: 'index',
-                        intersect: false,
-                    },
-                    plugins: {
-                        legend: { display: false },
-                        tooltip: {
-                            backgroundColor: '#1F2937',
-                            titleColor: '#F3F4F6',
-                            bodyColor: '#D1D5DB',
-                            borderColor: '#4B5563',
-                            borderWidth: 1,
-                            callbacks: {
-                                label: function(context) {
-                                    return context.parsed.y.toFixed(3);
-                                }
-                            }
-                        }
-                    },
+                    responsive: true, maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: { legend: { display: false } },
                     scales: {
-                        x: {
-                            title: { display: true, text: labelX, color: '#9CA3AF' },
-                            grid: { display: false }
-                        },
-                        y: {
-                            title: { display: true, text: labelY, color: '#9CA3AF' },
-                            beginAtZero: true,
-                            border: { dash: [4, 4] },
-                            grid: { color: '#374151' }
-                        }
+                        x: { title: {display: true, text: lx}, grid: {display:false} },
+                        y: { title: {display: true, text: ly}, grid: {color: '#374151'}, beginAtZero: true }
                     }
                 }
             });
         }
 
-        // Start
         window.addEventListener('DOMContentLoaded', init);
 
     </script>
